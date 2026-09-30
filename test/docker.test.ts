@@ -104,14 +104,19 @@ describe("docker: OOM ажиллаж байхад илэрнэ", () => {
   it("санах ойн хязгаар давсан контейнер oomKilled=true өгнө", async () => {
     const rt = makeRuntime();
     const ws = await rt.createWorkspace();
-    // 6MB хязгаар дээр /dev/shm рүү 200MB бичнэ — tmpfs нь cgroup-ийн
-    // санах ойд тооцогддог тул OOM killer ажиллана.
+    // Нэрлэгдээгүй (anonymous) санах ойг хоёр дахин ихэсгэсээр cgroup-ийн
+    // хязгаарт хүрнэ → цөмийн OOM killer контейнерийн үндсэн процессыг
+    // алж, State.OOMKilled тавигдана.
+    //
+    // ⚠️ /dev/shm рүү бичих аргыг ХЭРЭГЛЭХГҮЙ: Docker-ийн /dev/shm нь
+    //    өгөгдмөлөөр 64MB тул санах ойн хязгаарт хүрэхээсээ өмнө
+    //    "No space left on device" болж, OOM БИШ өөр шалтгаанаар унана.
     const m = await rt.create({
       workspace: ws,
       image: IMAGE,
-      argv: ["sh", "-c", "dd if=/dev/zero of=/dev/shm/x bs=1M count=200"],
+      argv: ["sh", "-c", 'A=x; while :; do A="$A$A"; done'],
       port: 3000,
-      memMb: 6,
+      memMb: 16,
       cpus: 1,
       workdir: "/app",
     });

@@ -64,4 +64,17 @@ jobs:
       - name: тестийн образ
         run: docker pull busybox:latest
       - name: гэрээ + OOM
-        run: node --experimental-strip-types --test test/docker.test.ts
+        # Гаралтыг ажлын хураангуй руу бичнэ. Шалтгаан: GitHub-ийн лог нь
+        # JS-ээр ачаалагддаг тул гаднаас уншигдахгүй — хураангуй нь HTML-д
+        # шууд байдаг. Унасан ч ногоон ч хамаагүй бичигдэнэ.
+        run: |
+          set +e
+          node --experimental-strip-types --test test/docker.test.ts 2>&1 | tee /tmp/out.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "## Docker гэрээний гаралт (exit=$code)"
+            echo '```'
+            tail -c 60000 /tmp/out.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
