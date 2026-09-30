@@ -11,8 +11,7 @@
 //    эцэст нь өөрсдөө цэвэрлэгдэнэ. SAND-ийн контейнерууд өөр шошготой
 //    тул list() тэднийг ХЭЗЭЭ Ч харахгүй.
 
-import { after, before, describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { after, before } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -91,26 +90,15 @@ runContractTests("docker (жинхэнэ)", {
   vanish: async (_rt: Runtime, m: Machine) => {
     await docker.getContainer(m.id).remove({ force: true });
   },
-  // forceOom ЗОРИУД өгөөгүй: контейнерийн OOM-ыг найдвартай өдөөх нь
-  // тусдаа туршилт шаардана. Гэрээ үүнийг "⚠️ ХЭМЖЭЭГҮЙ" гэж ил
-  // тэмдэглэнэ — чимээгүй ✅ болохгүй. Доорх тусдаа тест хэмжинэ.
-});
-
-// ───────────────────────────────────────────────────────────────────────
-// OOM — SAND-ийг хуурсан яг тэр хэмжигдэхүүн. Тусад нь хэмжинэ.
-// ───────────────────────────────────────────────────────────────────────
-
-describe("docker: OOM ажиллаж байхад илэрнэ", () => {
-  it("санах ойн хязгаар давсан контейнер oomKilled=true өгнө", async () => {
-    const rt = makeRuntime();
+  // Санах ойн хязгаараар ЗААВАЛ алагдах машин. Нэрлэгдээгүй санах ойг
+  // хоёр дахин ихэсгэсээр cgroup-ийн хязгаарт хүрнэ → цөмийн OOM killer
+  // үндсэн процессыг алж State.OOMKilled тавигдана.
+  //
+  // ⚠️ /dev/shm рүү бичих аргыг ХЭРЭГЛЭХГҮЙ: Docker-ийн /dev/shm нь
+  //    өгөгдмөлөөр 64MB тул санах ойн хязгаарт хүрэхээсээ өмнө
+  //    "No space left on device" болж, OOM БИШ шалтгаанаар унана.
+  oomMachine: async (rt: Runtime) => {
     const ws = await rt.createWorkspace();
-    // Нэрлэгдээгүй (anonymous) санах ойг хоёр дахин ихэсгэсээр cgroup-ийн
-    // хязгаарт хүрнэ → цөмийн OOM killer контейнерийн үндсэн процессыг
-    // алж, State.OOMKilled тавигдана.
-    //
-    // ⚠️ /dev/shm рүү бичих аргыг ХЭРЭГЛЭХГҮЙ: Docker-ийн /dev/shm нь
-    //    өгөгдмөлөөр 64MB тул санах ойн хязгаарт хүрэхээсээ өмнө
-    //    "No space left on device" болж, OOM БИШ өөр шалтгаанаар унана.
     const m = await rt.create({
       workspace: ws,
       image: IMAGE,
@@ -121,18 +109,6 @@ describe("docker: OOM ажиллаж байхад илэрнэ", () => {
       workdir: "/app",
     });
     await m.start();
-
-    // Дуусахыг хүлээнэ.
-    let st = await m.status();
-    for (let i = 0; i < 100 && st.state === "running"; i++) {
-      await new Promise((r) => setTimeout(r, 100));
-      st = await m.status();
-    }
-
-    assert.notEqual(st.state, "running", "контейнер дуусаагүй — тест найдваргүй");
-    assert.equal(st.oomKilled, true, "OOM болсныг status харуулсангүй");
-
-    await m.destroy();
-    await ws.dispose();
-  });
+    return m;
+  },
 });

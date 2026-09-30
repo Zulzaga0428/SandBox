@@ -616,6 +616,14 @@ export class DockerRuntime implements Runtime {
   }
 
   async get(id: string): Promise<Machine | null> {
+    // Docker-ийн id нь hex. Өөр ямар ч тэмдэгт орсон бол энэ runtime-ийн
+    // машин БАЙХ БОЛОМЖГҮЙ тул null.
+    //
+    // ⚠️ Зүгээр л dockerode-д дамжуулбал URL болгож чадалгүй ШИДНЭ
+    //    ('Request path contains unescaped characters') — 404 биш.
+    //    Гэрээ нь "байхгүй id дээр null" гэж шаарддаг тул шидэж болохгүй.
+    //    Үүнийг гэрээний тест жинхэнэ Docker дээр л гаргаж ирэв.
+    if (!/^[0-9a-f]{1,64}$/i.test(id)) return null;
     try {
       const info = await this.docker.getContainer(id).inspect();
       if (info.Config?.Labels?.[LABEL_MANAGED] !== "1") return null;

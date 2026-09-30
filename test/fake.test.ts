@@ -12,8 +12,20 @@ runContractTests("fake (бүрэн)", {
   vanish: (rt, m) => {
     (rt as FakeRuntime).world.vanished.add(m.id);
   },
-  forceOom: (rt, m) => {
-    (rt as FakeRuntime).world.oomed.add(m.id);
+  oomMachine: async (rt) => {
+    const f = rt as FakeRuntime;
+    const ws = await f.createWorkspace();
+    const m = await f.create({
+      workspace: ws,
+      image: "i",
+      port: 3000,
+      memMb: 8,
+      cpus: 1,
+      workdir: "/app",
+    });
+    await m.start();
+    f.world.oomed.add(m.id);
+    return m;
   },
 });
 
@@ -37,8 +49,20 @@ runContractTests("fake (Firecracker маягийн хязгаартай)", {
   vanish: (rt, m) => {
     (rt as FakeRuntime).world.vanished.add(m.id);
   },
-  forceOom: (rt, m) => {
-    (rt as FakeRuntime).world.oomed.add(m.id);
+  oomMachine: async (rt) => {
+    const f = rt as FakeRuntime;
+    const ws = await f.createWorkspace();
+    const m = await f.create({
+      workspace: ws,
+      image: "i",
+      port: 3000,
+      memMb: 8,
+      cpus: 1,
+      workdir: "/app",
+    });
+    await m.start();
+    f.world.oomed.add(m.id);
+    return m;
   },
 });
 

@@ -31,8 +31,16 @@ export interface ContractHooks {
    * харин "энэ runtime үүнийг хэмжиж чадахгүй" гэж ИЛ тэмдэглэгдэнэ.
    */
   vanish?(rt: Runtime, m: Machine): Promise<void> | void;
-  /** Машиныг OOM-оор алах. */
-  forceOom?(rt: Runtime, m: Machine): Promise<void> | void;
+  /**
+   * Санах ойн хязгаараар ЗААВАЛ алагдах машин үүсгэж, асаагаад буцаана.
+   * Гэрээ нь дуусахыг хүлээж, status()-ийг шалгана.
+   *
+   * Яагаад "байгаа машиныг OOM болго" биш вэ: Docker-т `exec`-ийн хүү
+   * процесс алагдахад контейнерийн `State.OOMKilled` тавигдахгүй —
+   * зөвхөн ҮНДСЭН процесс алагдахад тавигддаг. Тиймээс OOM-д зориулж
+   * тусдаа машин үүсгэх нь цорын ганц найдвартай арга.
+   */
+  oomMachine?(rt: Runtime): Promise<Machine>;
 }
 
 const DEFAULT_SPEC: Omit<MachineSpec, "workspace"> = {
@@ -352,22 +360,35 @@ export function runContractTests(label: string, hooks: ContractHooks): void {
       );
 
       it(
-        hooks.forceOom
-          ? "ажиллаж байхад OOM болвол status нь ХЭЗЭЭ Ч мэдэгдэнэ"
-          : "⚠️ ХЭМЖЭЭГҮЙ: энэ runtime forceOom дэмжихгүй",
+        hooks.oomMachine
+          ? "санах ойн хязгаараар алагдсаныг status ХЭЗЭЭ Ч мэдэгдэнэ"
+          : "⚠️ ХЭМЖЭЭГҮЙ: энэ runtime oomMachine дэмжихгүй",
         async (t) => {
-          if (!hooks.forceOom) {
-            t.diagnostic(`${label}: forceOom hook алга — OOM-ыг ШАЛГААГҮЙ`);
+          if (!hooks.oomMachine) {
+            t.diagnostic(`${label}: oomMachine hook алга — OOM-ыг ШАЛГААГҮЙ`);
             return;
           }
           const rt = await make();
-          const { m } = await withMachine(rt);
-          await hooks.forceOom(rt, m);
-          const st = await m.status();
-          if (rt.caps.memoryLimit) {
-            assert.equal(st.oomKilled, true, "OOM болсныг status харуулсангүй");
-          } else {
-            assert.equal(st.oomKilled, false, "memoryLimit=false үед oomKilled үнэн болж болохгүй");
+          const m = await hooks.oomMachine(rt);
+          try {
+            // Дуусахыг хүлээнэ. Хугацаа хэтэрвэл тест өөрөө найдваргүй —
+            // "ногоон" гэж дүгнэхгүй, ил унана.
+            let st = await m.status();
+            for (let i = 0; i < 200 && st.state === "running"; i++) {
+              await new Promise((r) => setTimeout(r, 100));
+              st = await m.status();
+            }
+            assert.notEqual(st.state, "running", "машин дуусаагүй — OOM өдөөлт ажиллаагүй");
+
+            if (rt.caps.memoryLimit) {
+              assert.equal(st.oomKilled, true, "OOM болсныг status харуулсангүй");
+            } else {
+              // memoryLimit=false нь "OOM болоогүй" гэсэн үг БИШ,
+              // "хэмжиж чадахгүй" гэсэн үг. Худал true гаргаж болохгүй.
+              assert.equal(st.oomKilled, false, "memoryLimit=false үед oomKilled үнэн болж болохгүй");
+            }
+          } finally {
+            await m.destroy();
           }
         },
       );
