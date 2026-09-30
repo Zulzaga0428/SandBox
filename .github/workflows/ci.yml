@@ -64,9 +64,11 @@ jobs:
       - name: тестийн образ
         run: docker pull busybox:latest
       - name: гэрээ + OOM
-        # Гаралтыг ажлын хураангуй руу бичнэ. Шалтгаан: GitHub-ийн лог нь
-        # JS-ээр ачаалагддаг тул гаднаас уншигдахгүй — хураангуй нь HTML-д
-        # шууд байдаг. Унасан ч ногоон ч хамаагүй бичигдэнэ.
+        # Гаралтыг ХОЁР зам руу гаргана:
+        #   1. ажлын хураангуй — хүн харахад
+        #   2. тэмдэглэгээ (::error::) — checks API-аар ГАДНААС уншигдана
+        # Шалтгаан: GitHub-ийн лог ба хураангуй хоёулаа JS-ээр ачаалагддаг
+        # тул автоматаар уншигдахгүй. Тэмдэглэгээ нь нээлттэй API-д байдаг.
         run: |
           set +e
           node --experimental-strip-types --test test/docker.test.ts 2>&1 | tee /tmp/out.txt
@@ -77,4 +79,13 @@ jobs:
             tail -c 60000 /tmp/out.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          msg=$(grep -aE 'not ok|error:|expected|actual|AssertionError|operator|^# (tests|pass|fail|skipped)|ХЭМЖЭЭГҮЙ' /tmp/out.txt | head -80)
+          msg="${msg//'%'/%25}"
+          msg="${msg//$'\n'/%0A}"
+          msg="${msg//$'\r'/%0D}"
+          if [ "$code" -ne 0 ]; then
+            echo "::error title=docker-contract::$msg"
+          else
+            echo "::notice title=docker-contract-ok::$msg"
+          fi
           exit $code
