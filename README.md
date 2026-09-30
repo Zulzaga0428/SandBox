@@ -1,5 +1,7 @@
 # SandBox
 
+[![CI](https://github.com/Zulzaga0428/SandBox/actions/workflows/ci.yml/badge.svg)](https://github.com/Zulzaga0428/SandBox/actions/workflows/ci.yml)
+
 AI-д зориулсан preview sandbox. Гаднын хүмүүс өөрийн кодоо ажиллуулж
 болдог тусгаарлагдсан орчин.
 
@@ -58,12 +60,12 @@ runContractTests("миний-runtime", { make: () => new MyRuntime() });
 
 | # | Runtime | Хаана | Төлөв |
 |---|---|---|---|
-| 1 | `FakeRuntime` | санах ойд | ✅ бэлэн, 76/76 |
-| 2 | `DockerRuntime` | Vultr, $0 | 🟡 бичигдсэн, типүүд цэвэр — **жинхэнэ Docker дээр АЖИЛЛУУЛААГҮЙ** |
-| 3 | `FirecrackerRuntime` | bare metal | ⬜ |
+| 1 | `FakeRuntime` | санах ойд | ✅ 76/76 |
+| 2 | `DockerRuntime` | Docker-той ямар ч Linux | ✅ **жинхэнэ Docker дээр 32/32** (CI) |
+| 3 | `FirecrackerRuntime` | bare metal | ⬜ мөнгө орсны дараа |
 
-🟡 гэдэг нь **батлагдаагүй** гэсэн үг. `npm run test:docker` ажиллаж
-ногоон болтол DockerRuntime-ыг «ажиллаж байна» гэж бүү үз.
+DockerRuntime-д **сервер шаардлагагүй** — GitHub Actions-ийн үнэгүй
+runner дээр гэрээ бүрэн гүйцэтгэгддэг. Vultr, SSH, $0.
 
 Дараа нь runtime-аас хамаарахгүй хэсгүүд — дулаан сан, preview домэйн +
 wildcard TLS, TTL/keepalive, хэмжигч, багтаамжийн хаалт.
