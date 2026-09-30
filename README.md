@@ -12,9 +12,13 @@ AI-д зориулсан preview sandbox. Гаднын хүмүүс өөрийн
 ## Хурдан эхлэл
 
 ```bash
-npm test          # 76 тест, хамаарал ТЭГ, Docker хэрэггүй
-npm run typecheck # tsc --noEmit  (эхлээд: npm install)
+npm test          # 76 тест. Docker ХЭРЭГГҮЙ, интернэт хэрэггүй.
+npm run test:docker  # гэрээг ЖИНХЭНЭ Docker дээр. Docker олдохгүй бол УНАНА.
+npm run typecheck    # tsc --noEmit
 ```
+
+`test:docker` нь `test`-д ордоггүй. Санаатай: Docker байхгүй машин дээр
+чимээгүй алгасвал «алгасалт нь амжилт гэж уншигдах» болно.
 
 Node ≥ 22.6 хэрэгтэй. TypeScript нь `--experimental-strip-types`-аар
 шууд ажиллана — build алхам байхгүй, bundler байхгүй, ялзрах хэрэгсэл
@@ -24,9 +28,12 @@ Node ≥ 22.6 хэрэгтэй. TypeScript нь `--experimental-strip-types`-а�
 
 ```
 src/runtime/types.ts   Runtime интерфейс — төслийн ГЭРЭЭ
+src/runtime/paths.ts   Замын шалгалт — хэрэгжүүлэлт БҮР ижлийг ашиглана
 src/runtime/fake.ts    FakeRuntime — санах ойд, тестэд зориулсан
+src/runtime/docker.ts  DockerRuntime — bind mount, putArchive БИШ
 test/contract.ts       Хэрэгжүүлэлт БҮР дамжих ёстой гэрээний тестүүд
 test/fake.test.ts      Гэрээ × 2 тохиргоо + мутацийн сорил
+test/docker.test.ts    Гэрээ жинхэнэ Docker дээр + OOM-ийн тусдаа тест
 test/no-leak.test.ts   Механик хамгаалалт (доор үзнэ үү)
 ```
 
@@ -51,9 +58,12 @@ runContractTests("миний-runtime", { make: () => new MyRuntime() });
 
 | # | Runtime | Хаана | Төлөв |
 |---|---|---|---|
-| 1 | `FakeRuntime` | санах ойд | ✅ бэлэн |
-| 2 | `DockerRuntime` | Vultr, $0 | ⬜ |
+| 1 | `FakeRuntime` | санах ойд | ✅ бэлэн, 76/76 |
+| 2 | `DockerRuntime` | Vultr, $0 | 🟡 бичигдсэн, типүүд цэвэр — **жинхэнэ Docker дээр АЖИЛЛУУЛААГҮЙ** |
 | 3 | `FirecrackerRuntime` | bare metal | ⬜ |
+
+🟡 гэдэг нь **батлагдаагүй** гэсэн үг. `npm run test:docker` ажиллаж
+ногоон болтол DockerRuntime-ыг «ажиллаж байна» гэж бүү үз.
 
 Дараа нь runtime-аас хамаарахгүй хэсгүүд — дулаан сан, preview домэйн +
 wildcard TLS, TTL/keepalive, хэмжигч, багтаамжийн хаалт.

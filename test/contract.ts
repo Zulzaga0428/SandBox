@@ -10,12 +10,21 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { Machine, Runtime, Workspace } from "../src/runtime/types.ts";
+import type { Machine, MachineSpec, Runtime, Workspace } from "../src/runtime/types.ts";
 import { ExecUnsupportedError } from "../src/runtime/types.ts";
 
 export interface ContractHooks {
   /** Шинэ runtime үүсгэнэ. Тест бүрд цоо шинэ. */
   make(): Promise<Runtime> | Runtime;
+  /** Машины үзүүлэлт. Docker-т жинхэнэ образ хэрэгтэй. */
+  spec?: Omit<MachineSpec, "workspace">;
+  /**
+   * Их хэмжээний гаралт үүсгэх команд. Өгөөгүй бол тайралтын тест
+   * АЖИЛЛАХГҮЙ — чимээгүй ✅ биш, ил тэмдэглэгдэнэ.
+   */
+  bigOutputCmd?: string[];
+  /** Хугацаа хэтрүүлэх команд. Өгөөгүй бол timeout-ийн тест ажиллахгүй. */
+  hangCmd?: string[];
   /**
    * Машиныг доод давхаргаас "алга болгох" (controller-ийн мэдэлгүйгээр).
    * Дэмжихгүй бол undefined — тэр тохиолдолд холбогдох тест SKIP БИШ,
@@ -26,7 +35,7 @@ export interface ContractHooks {
   forceOom?(rt: Runtime, m: Machine): Promise<void> | void;
 }
 
-const SPEC = {
+const DEFAULT_SPEC: Omit<MachineSpec, "workspace"> = {
   image: "test-image",
   port: 3000,
   memMb: 512,
@@ -36,6 +45,7 @@ const SPEC = {
 
 export function runContractTests(label: string, hooks: ContractHooks): void {
   const make = async () => await hooks.make();
+  const SPEC = hooks.spec ?? DEFAULT_SPEC;
 
   const withMachine = async (rt: Runtime): Promise<{ ws: Workspace; m: Machine }> => {
     const ws = await rt.createWorkspace();
@@ -280,26 +290,41 @@ export function runContractTests(label: string, hooks: ContractHooks): void {
         );
       });
 
-      it("гаралт нь maxOutputBytes-д тасарвал truncated ҮНЭН", async () => {
-        const rt = await make();
-        if (!rt.caps.exec) return;
-        const { m } = await withMachine(rt);
-        const r = await m.exec(["huge"], { timeoutMs: 5000, maxOutputBytes: 16 });
-        assert.ok(Buffer.byteLength(r.stdout, "utf8") <= 16, "хязгаараас хэтэрсэн");
-        if (r.stdout.length > 0) {
+      it(
+        hooks.bigOutputCmd
+          ? "гаралт нь maxOutputBytes-д тасарвал truncated ҮНЭН"
+          : "⚠️ ХЭМЖЭЭГҮЙ: bigOutputCmd өгөгдөөгүй",
+        async (t) => {
+          const rt = await make();
+          if (!rt.caps.exec) return;
+          if (!hooks.bigOutputCmd) {
+            t.diagnostic(`${label}: bigOutputCmd алга — ТАЙРАЛТЫГ ШАЛГААГҮЙ`);
+            return;
+          }
+          const { m } = await withMachine(rt);
+          const r = await m.exec(hooks.bigOutputCmd, { timeoutMs: 15000, maxOutputBytes: 16 });
+          assert.ok(Buffer.byteLength(r.stdout, "utf8") <= 16, "хязгаараас хэтэрсэн");
           assert.equal(r.truncated, true, "дуугүй тайрсан байна");
-        }
-      });
+        },
+      );
 
-      it("timeout болвол timedOut ҮНЭН, exitCode нь null", async () => {
-        const rt = await make();
-        if (!rt.caps.exec) return;
-        const { m } = await withMachine(rt);
-        const r = await m.exec(["hang"], { timeoutMs: 50, maxOutputBytes: 1024 });
-        if (r.timedOut) {
+      it(
+        hooks.hangCmd
+          ? "timeout болвол timedOut ҮНЭН, exitCode нь null"
+          : "⚠️ ХЭМЖЭЭГҮЙ: hangCmd өгөгдөөгүй",
+        async (t) => {
+          const rt = await make();
+          if (!rt.caps.exec) return;
+          if (!hooks.hangCmd) {
+            t.diagnostic(`${label}: hangCmd алга — TIMEOUT-ЫГ ШАЛГААГҮЙ`);
+            return;
+          }
+          const { m } = await withMachine(rt);
+          const r = await m.exec(hooks.hangCmd, { timeoutMs: 300, maxOutputBytes: 1024 });
+          assert.equal(r.timedOut, true, "timeout болоогүй — hangCmd үнэхээр өлгөж байна уу?");
           assert.equal(r.exitCode, null, "timeout дээр exitCode 0 гэж хэвлэгдлээ");
-        }
-      });
+        },
+      );
     });
 
     // ─────────────────────────────────────────────────────────────────

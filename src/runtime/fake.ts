@@ -33,6 +33,7 @@ import type {
   WriteResult,
 } from "./types.ts";
 import { ExecUnsupportedError } from "./types.ts";
+import { byteLen, checkPath } from "./paths.ts";
 
 export const DEFAULT_CAPS: Capabilities = {
   fileWatch: "inotify",
@@ -68,7 +69,12 @@ export function makeWorld(over: Partial<FakeWorld> = {}): FakeWorld {
     maxFiles: 500,
     maxFileBytes: 2 * 1024 * 1024,
     maxTotalBytes: 32 * 1024 * 1024,
-    execResults: new Map(),
+    // Гэрээний тестийн "хайгуул" командууд. Жинхэнэ runtime дээр эдгээрийн
+    // оронд жинхэнэ команд өгөгдөнө (Docker: sh -c "yes | head -c ...").
+    execResults: new Map<string, Partial<ExecResult>>([
+      ["huge", { stdout: "x".repeat(4096) }],
+      ["hang", { timedOut: true }],
+    ]),
     vanished: new Set(),
     oomed: new Set(),
     logs: new Map(),
@@ -79,25 +85,6 @@ export function makeWorld(over: Partial<FakeWorld> = {}): FakeWorld {
 
 let seq = 0;
 const nextId = (prefix: string) => prefix + "-" + (++seq).toString(36).padStart(4, "0");
-
-// ───────────────────────────────────────────────────────────────────────
-// Замын шалгалт — гарч зугтахаас сэргийлнэ
-// ───────────────────────────────────────────────────────────────────────
-
-export function checkPath(p: string): RejectReason | null {
-  if (typeof p !== "string" || p.length === 0) return "path-invalid";
-  if (p.length > 1024) return "path-invalid";
-  if (p.includes("\0")) return "path-invalid";
-  if (p.startsWith("/") || /^[a-zA-Z]:/.test(p)) return "path-escape";
-  if (p.includes("\\")) return "path-escape";
-  const parts = p.split("/");
-  if (parts.some((s) => s === ".." )) return "path-escape";
-  if (parts.some((s) => s === "")) return "path-invalid";
-  return null;
-}
-
-const byteLen = (v: string | Uint8Array) =>
-  typeof v === "string" ? Buffer.byteLength(v, "utf8") : v.byteLength;
 
 // ───────────────────────────────────────────────────────────────────────
 // Workspace

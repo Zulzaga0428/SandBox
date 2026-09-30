@@ -7,6 +7,8 @@ import type { Machine, Runtime } from "../src/runtime/types.ts";
 // ── 1. Бүрэн чадвартай fake — гэрээг бүхэлд нь дамжина ────────────────
 runContractTests("fake (бүрэн)", {
   make: () => new FakeRuntime(),
+  bigOutputCmd: ["huge"],
+  hangCmd: ["hang"],
   vanish: (rt, m) => {
     (rt as FakeRuntime).world.vanished.add(m.id);
   },
@@ -30,6 +32,8 @@ runContractTests("fake (Firecracker маягийн хязгаартай)", {
         exec: false,
       },
     }),
+  bigOutputCmd: ["huge"],
+  hangCmd: ["hang"],
   vanish: (rt, m) => {
     (rt as FakeRuntime).world.vanished.add(m.id);
   },
