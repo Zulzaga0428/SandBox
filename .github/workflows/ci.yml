@@ -1,0 +1,67 @@
+name: CI
+
+# Яагаад GitHub Actions вэ:
+#   DockerRuntime-ыг батлахад Docker-той Linux хост хэрэгтэй. Сервер БИШ.
+#   Actions-ийн runner дээр Ubuntu + Docker бэлэн ирдэг, үнэгүй.
+#   → Vultr шаардлагагүй, SSH шаардлагагүй, $0.
+#
+# Энэ нь интерфейсийн гол санааг ч бас батлана: runtime-ийн хост нь
+# солигддог зүйл. Өнөөдөр Actions, маргааш Hetzner, дараа нь bare metal.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # Docker хэрэггүй хэсэг. Хамаарал ТЭГ — npm install ч хийхгүй.
+  # ─────────────────────────────────────────────────────────────────────
+  logic:
+    name: логик (Docker-гүй)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: npm test
+        run: node --experimental-strip-types --test test/fake.test.ts test/no-leak.test.ts
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Типүүд
+  # ─────────────────────────────────────────────────────────────────────
+  types:
+    name: типүүд
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  # ─────────────────────────────────────────────────────────────────────
+  # ЖИНХЭНЭ Docker дээрх гэрээ. Энэ л DockerRuntime-ыг 🟡-аас ✅ болгоно.
+  # ─────────────────────────────────────────────────────────────────────
+  docker:
+    name: гэрээ (жинхэнэ Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Docker байгааг батлах
+        # Хэрэв Docker байхгүй бол ЭНД унана. Чимээгүй алгасахгүй —
+        # "алгасалт нь амжилт гэж уншигдах ЁСГҮЙ".
+        run: docker version
+      - name: тестийн образ
+        run: docker pull busybox:latest
+      - name: гэрээ + OOM
+        run: node --experimental-strip-types --test test/docker.test.ts
