@@ -66,12 +66,14 @@ runContractTests("миний-runtime", { make: () => new MyRuntime() });
 
 | # | Runtime | Хаана | Төлөв |
 |---|---|---|---|
-| 1 | `FakeRuntime` | санах ойд | ✅ 76/76 |
-| 2 | `DockerRuntime` | Docker-той ямар ч Linux | ✅ **жинхэнэ Docker дээр 32/32** (CI) |
+| 1 | `FakeRuntime` | санах ойд | ✅ гэрээ × 2 тохиргоо |
+| 2 | `DockerRuntime` | Docker-той ямар ч Linux | ✅ **жинхэнэ Docker дээр 39/39** (CI) |
 | 3 | `FirecrackerRuntime` | bare metal | ⬜ мөнгө орсны дараа |
 
 DockerRuntime-д **сервер шаардлагагүй** — GitHub Actions-ийн үнэгүй
 runner дээр гэрээ бүрэн гүйцэтгэгддэг. Vultr, SSH, $0.
+
+Нийт: **107 тест** Docker-гүйгээр + **39 тест** жинхэнэ Docker дээр.
 
 ## Runtime-аас хамаарахгүй давхарга
 
