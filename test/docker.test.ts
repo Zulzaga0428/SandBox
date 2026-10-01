@@ -11,13 +11,15 @@
 //    эцэст нь өөрсдөө цэвэрлэгдэнэ. SAND-ийн контейнерууд өөр шошготой
 //    тул list() тэднийг ХЭЗЭЭ Ч харахгүй.
 
-import { after, before } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Docker from "dockerode";
 
+import assert from "node:assert/strict";
 import { DockerRuntime } from "../src/runtime/docker.ts";
+import { PreviewManager } from "../src/manager/preview.ts";
 import { runContractTests } from "./contract.ts";
 import type { Machine, Runtime } from "../src/runtime/types.ts";
 
@@ -111,4 +113,69 @@ runContractTests("docker (жинхэнэ)", {
     await m.start();
     return m;
   },
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// PreviewManager ЖИНХЭНЭ Docker дээр. Fake дээр аль хэдийн 21 тест бий;
+// энд bind mount, reconcile, getWorkspace гурав ЖИНХЭНЭ ТӨМӨР дээр
+// уулздаг нэг урсгалыг шалгана.
+// ───────────────────────────────────────────────────────────────────────
+
+describe("PreviewManager жинхэнэ Docker дээр", () => {
+  const mkManager = (rt: Runtime, max = 2) =>
+    new PreviewManager({
+      runtime: rt,
+      image: IMAGE,
+      argv: ["sleep", "3600"],
+      workdir: "/app",
+      port: 3000,
+      memMb: 64,
+      cpus: 1,
+      maxPreviews: max,
+      ttlMs: 60_000,
+    });
+
+  it("үүсгэх → restart → сэргээх → файл шинэчлэх", async () => {
+    const rt = makeRuntime();
+    const mgr = mkManager(rt);
+
+    const p = await mgr.create({ "index.html": "<h1>сайн уу</h1>" });
+    assert.equal(mgr.stats().active, 1);
+    const ep = await mgr.endpoint(p.id);
+    assert.ok(ep, "endpoint гарсангүй");
+
+    // Controller дахин эхэлсэн дүр — ШИНЭ manager, ижил runtime.
+    const fresh = mkManager(rt);
+    assert.equal(fresh.list().length, 0);
+    const r = await fresh.reconcile();
+    assert.deepEqual(r.adopted, [p.id], "амьд preview сэргээгдсэнгүй");
+
+    // Хамгийн чухал: сэргээсний дараа файл бичих боломж байгаа эсэх.
+    const w = await fresh.updateFiles(p.id, { "index.html": "шинэчлэв" });
+    assert.deepEqual(w.rejected, []);
+
+    // Файл контейнер ДОТОР ҮНЭХЭЭР харагдаж байгаа эсэх — bind mount-ийн
+    // жинхэнэ шалгуур. `putArchive` биш гэдгийг энэ батална.
+    const m = await rt.get(p.id);
+    const out = await m!.exec(["cat", "/app/index.html"], {
+      timeoutMs: 10_000,
+      maxOutputBytes: 4096,
+    });
+    assert.equal(out.exitCode, 0, `cat унав: ${out.stderr}`);
+    assert.match(out.stdout, /шинэчлэв/, "bind mount-аар дотор харагдсангүй");
+
+    await fresh.stop(p.id);
+    assert.equal(fresh.stats().active, 0);
+  });
+
+  it("багтаамж дүүрэхэд зэрэгцээ хүсэлтүүд хязгаарыг давахгүй", async () => {
+    const rt = makeRuntime();
+    const mgr = mkManager(rt, 2);
+    const res = await Promise.allSettled(
+      Array.from({ length: 5 }, (_, i) => mgr.create({ [`f${i}.txt`]: String(i) })),
+    );
+    const ok = res.filter((x) => x.status === "fulfilled").length;
+    assert.equal(ok, 2, `хязгаар давсан: ${ok}`);
+    for (const p of mgr.list()) await mgr.stop(p.id);
+  });
 });

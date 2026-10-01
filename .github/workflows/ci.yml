@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: "22"
       - name: npm test
-        run: node --experimental-strip-types --test test/fake.test.ts test/no-leak.test.ts
+        run: node --experimental-strip-types --test test/fake.test.ts test/preview.test.ts test/no-leak.test.ts
 
   # ─────────────────────────────────────────────────────────────────────
   # Типүүд

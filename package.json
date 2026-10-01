@@ -7,7 +7,7 @@
     "node": ">=22.6"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test test/fake.test.ts test/no-leak.test.ts",
+    "test": "node --experimental-strip-types --test test/fake.test.ts test/preview.test.ts test/no-leak.test.ts",
     "test:docker": "node --experimental-strip-types --test test/docker.test.ts",
     "typecheck": "tsc --noEmit"
   },

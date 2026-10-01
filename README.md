@@ -14,7 +14,7 @@ AI-д зориулсан preview sandbox. Гаднын хүмүүс өөрийн
 ## Хурдан эхлэл
 
 ```bash
-npm test          # 76 тест. Docker ХЭРЭГГҮЙ, интернэт хэрэггүй.
+npm test          # 107 тест. Docker ХЭРЭГГҮЙ, интернэт хэрэггүй.
 npm run test:docker  # гэрээг ЖИНХЭНЭ Docker дээр. Docker олдохгүй бол УНАНА.
 npm run typecheck    # tsc --noEmit
 ```
@@ -33,9 +33,15 @@ src/runtime/types.ts   Runtime интерфейс — төслийн ГЭРЭЭ
 src/runtime/paths.ts   Замын шалгалт — хэрэгжүүлэлт БҮР ижлийг ашиглана
 src/runtime/fake.ts    FakeRuntime — санах ойд, тестэд зориулсан
 src/runtime/docker.ts  DockerRuntime — bind mount, putArchive БИШ
+
+src/manager/errors.ts  Алдааны гэрээ — бүгд нэртэй, бүгд кодтой
+src/manager/preview.ts PreviewManager — багтаамж, TTL, reconcile, хэмжигч
+                       ⚠️ доод давхаргыг НЭРЭЭР Ч мэдэхгүй
+
 test/contract.ts       Хэрэгжүүлэлт БҮР дамжих ёстой гэрээний тестүүд
 test/fake.test.ts      Гэрээ × 2 тохиргоо + мутацийн сорил
-test/docker.test.ts    Гэрээ жинхэнэ Docker дээр + OOM-ийн тусдаа тест
+test/preview.test.ts   PreviewManager — хиймэл цагаар, хүлээлтгүй
+test/docker.test.ts    Гэрээ + PreviewManager ЖИНХЭНЭ Docker дээр
 test/no-leak.test.ts   Механик хамгаалалт (доор үзнэ үү)
 ```
 
@@ -67,5 +73,17 @@ runContractTests("миний-runtime", { make: () => new MyRuntime() });
 DockerRuntime-д **сервер шаардлагагүй** — GitHub Actions-ийн үнэгүй
 runner дээр гэрээ бүрэн гүйцэтгэгддэг. Vultr, SSH, $0.
 
-Дараа нь runtime-аас хамаарахгүй хэсгүүд — дулаан сан, preview домэйн +
-wildcard TLS, TTL/keepalive, хэмжигч, багтаамжийн хаалт.
+## Runtime-аас хамаарахгүй давхарга
+
+VMM солигдоход **амьд үлдэх** хэсэг. 10 жил наслах хөрөнгө нь энэ.
+
+| | Төлөв |
+|---|---|
+| багтаамжийн хаалт (зэрэгцээ хүсэлтийн race-тай) | ✅ |
+| TTL / keepalive / sweep | ✅ |
+| restart-аас сэргэх (reconcile + getWorkspace) | ✅ |
+| хэмжигч (хэмжээгүйг `null`, 0 БИШ) | ✅ |
+| алдааны гэрээ (нэртэй код) | ✅ |
+| дулаан сан | ⬜ |
+| preview домэйн + wildcard TLS + чиглүүлэлт | ⬜ |
+| HTTP API | ⬜ |
