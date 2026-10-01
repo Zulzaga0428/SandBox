@@ -79,7 +79,7 @@ jobs:
             tail -c 60000 /tmp/out.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          msg=$(grep -aE 'not ok|error:|expected|actual|AssertionError|operator|^# (tests|pass|fail|skipped)|ХЭМЖЭЭГҮЙ' /tmp/out.txt | head -80)
+          msg=$(grep -aE -A3 'not ok|error:|expected:|actual:|AssertionError|^\s*[+-] |^# (tests|pass|fail|skipped)|ХЭМЖЭЭГҮЙ' /tmp/out.txt | head -120)
           msg="${msg//'%'/%25}"
           msg="${msg//$'\n'/%0A}"
           msg="${msg//$'\r'/%0D}"

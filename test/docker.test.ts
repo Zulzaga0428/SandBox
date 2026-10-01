@@ -26,6 +26,9 @@ import type { Machine, Runtime } from "../src/runtime/types.ts";
 const IMAGE = process.env.SANDBOX_TEST_IMAGE ?? "busybox:latest";
 const NS = "contract-" + Math.random().toString(36).slice(2, 8);
 
+/** Цэвэрлэх ёстой бүх namespace. Тест тусгаарлахад шинээр нэмэгдэнэ. */
+const namespaces: string[] = [NS];
+
 const docker = new Docker();
 let root = "";
 
@@ -58,15 +61,17 @@ before(async () => {
 
 after(async () => {
   // Өөрсдийн үлдэгдлийг цэвэрлэнэ. ЗӨВХӨН өөрсдийн шошготойг.
-  const rows = await docker.listContainers({
-    all: true,
-    filters: { label: ["sandbox.managed=1", `sandbox.namespace=${NS}`] },
-  });
-  for (const r of rows) {
-    try {
-      await docker.getContainer(r.Id).remove({ force: true });
-    } catch {
-      /* аль хэдийн устсан */
+  for (const ns of namespaces) {
+    const rows = await docker.listContainers({
+      all: true,
+      filters: { label: ["sandbox.managed=1", `sandbox.namespace=${ns}`] },
+    });
+    for (const r of rows) {
+      try {
+        await docker.getContainer(r.Id).remove({ force: true });
+      } catch {
+        /* аль хэдийн устсан */
+      }
     }
   }
   if (root) await rm(root, { recursive: true, force: true });
@@ -122,6 +127,22 @@ runContractTests("docker (жинхэнэ)", {
 // ───────────────────────────────────────────────────────────────────────
 
 describe("PreviewManager жинхэнэ Docker дээр", () => {
+  /**
+   * Тусгаарлагдсан runtime — өөрийн namespace-тай.
+   *
+   * ⚠️ Яагаад тусгаарлах ёстой вэ: гэрээний тестүүд санаатайгаар
+   *    контейнер үлдээдэг (жишээ нь «start дараа running» нь destroy
+   *    хийдэггүй). Ижил namespace хуваалцвал `reconcile()` ТЭДГЭЭРИЙГ ч
+   *    сэргээж, `adopted` дотор хачин id-ууд орно. Эхний ажиллалтад яг
+   *    ингэж уналаа.
+   */
+  let n = 0;
+  const isolated = (): Runtime => {
+    const ns = `${NS}-mgr${++n}`;
+    namespaces.push(ns);
+    return new DockerRuntime({ workspaceRoot: join(root, ns), namespace: ns, docker });
+  };
+
   const mkManager = (rt: Runtime, max = 2) =>
     new PreviewManager({
       runtime: rt,
@@ -136,7 +157,7 @@ describe("PreviewManager жинхэнэ Docker дээр", () => {
     });
 
   it("үүсгэх → restart → сэргээх → файл шинэчлэх", async () => {
-    const rt = makeRuntime();
+    const rt = isolated();
     const mgr = mkManager(rt);
 
     const p = await mgr.create({ "index.html": "<h1>сайн уу</h1>" });
@@ -169,7 +190,7 @@ describe("PreviewManager жинхэнэ Docker дээр", () => {
   });
 
   it("багтаамж дүүрэхэд зэрэгцээ хүсэлтүүд хязгаарыг давахгүй", async () => {
-    const rt = makeRuntime();
+    const rt = isolated();
     const mgr = mkManager(rt, 2);
     const res = await Promise.allSettled(
       Array.from({ length: 5 }, (_, i) => mgr.create({ [`f${i}.txt`]: String(i) })),
