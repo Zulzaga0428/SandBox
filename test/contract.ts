@@ -176,6 +176,46 @@ export function runContractTests(label: string, hooks: ContractHooks): void {
         assert.equal(r.rejected[0]?.reason, "disposed");
       });
 
+      it("getWorkspace нь ижил файлуудыг эргүүлж өгнө (restart-ийн дараа)", async () => {
+        const rt = await make();
+        const ws = await rt.createWorkspace();
+        await ws.write({ "src/App.tsx": "export default App" });
+
+        // Controller дахин эхэлсэн дүр — зөвхөн id-г мэднэ, объектыг биш.
+        const again = await rt.getWorkspace(ws.id);
+        assert.ok(again, "getWorkspace нь null буцаалаа — preview сэргэхгүй");
+        assert.equal(again!.id, ws.id);
+        assert.deepEqual(await again!.list(), ["src/App.tsx"]);
+        assert.equal(
+          (await again!.read(["src/App.tsx"]))["src/App.tsx"],
+          "export default App",
+        );
+      });
+
+      it("сэргээсэн workspace руу бичих нь ажиллана", async () => {
+        const rt = await make();
+        const ws = await rt.createWorkspace();
+        await ws.write({ "a.txt": "нэг" });
+        const again = await rt.getWorkspace(ws.id);
+        const r = await again!.write({ "b.txt": "хоёр" });
+        assert.deepEqual(r.rejected, []);
+        assert.deepEqual(await ws.list(), ["a.txt", "b.txt"], "хоёр объект нэг л хавтсыг хуваалцах ёстой");
+      });
+
+      it("dispose хийсэн workspace-ийг getWorkspace өгөхгүй", async () => {
+        const rt = await make();
+        const ws = await rt.createWorkspace();
+        await ws.dispose();
+        assert.equal(await rt.getWorkspace(ws.id), null);
+      });
+
+      it("байхгүй id дээр getWorkspace нь null (шидэхгүй)", async () => {
+        const rt = await make();
+        assert.equal(await rt.getWorkspace("байхгүй-ws"), null);
+        assert.equal(await rt.getWorkspace("../гадна"), null);
+        assert.equal(await rt.getWorkspace(""), null);
+      });
+
       it("dispose нь идемпотент", async () => {
         const rt = await make();
         const ws = await rt.createWorkspace();
@@ -278,6 +318,21 @@ export function runContractTests(label: string, hooks: ContractHooks): void {
         const again = await rt.get(m.id);
         assert.ok(again, "get нь null буцаалаа");
         assert.equal(again!.id, m.id);
+      });
+
+      it("list-ийн workspaceId нь getWorkspace-д ажиллана", async () => {
+        const rt = await make();
+        const ws = await rt.createWorkspace();
+        await ws.write({ "a.txt": "а" });
+        const m = await rt.create({ ...SPEC, workspace: ws });
+        await m.start();
+
+        const row = (await rt.list()).find((x) => x.id === m.id);
+        assert.ok(row, "машин list-д байхгүй");
+        assert.ok(row!.workspaceId, "workspaceId null — restart-д файлууд олдохгүй");
+        const back = await rt.getWorkspace(row!.workspaceId!);
+        assert.ok(back, "list-ийн workspaceId-гаар workspace олдсонгүй");
+        assert.deepEqual(await back!.list(), ["a.txt"]);
       });
 
       it("байхгүй id дээр get нь null", async () => {

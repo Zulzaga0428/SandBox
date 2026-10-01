@@ -322,6 +322,7 @@ export class FakeRuntime implements Runtime {
   readonly caps: Capabilities;
   readonly world: FakeWorld;
   private machines = new Map<string, FakeMachine>();
+  private workspaces = new Map<string, FakeWorkspace>();
 
   constructor(opts: { caps?: Partial<Capabilities>; world?: FakeWorld } = {}) {
     this.caps = { ...DEFAULT_CAPS, ...opts.caps };
@@ -329,7 +330,15 @@ export class FakeRuntime implements Runtime {
   }
 
   async createWorkspace(): Promise<Workspace> {
-    return new FakeWorkspace(this.world);
+    const ws = new FakeWorkspace(this.world);
+    this.workspaces.set(ws.id, ws);
+    return ws;
+  }
+
+  async getWorkspace(id: string): Promise<Workspace | null> {
+    const ws = this.workspaces.get(id);
+    if (!ws || ws._isDisposed()) return null;
+    return ws;
   }
 
   async create(spec: MachineSpec): Promise<Machine> {

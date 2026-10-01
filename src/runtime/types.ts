@@ -260,6 +260,19 @@ export interface Runtime {
   readonly caps: Capabilities;
 
   createWorkspace(): Promise<Workspace>;
+
+  /**
+   * id-гаар workspace эргүүлж авах. Байхгүй эсвэл устсан бол null.
+   *
+   * ⚠️ Controller дахин эхлэхэд preview-үүдийг СЭРГЭЭХЭД заавал хэрэгтэй.
+   *    Машиныг `get()`-ээр олж чадсан ч түүний файлууд руу хүрэх зам
+   *    байхгүй бол preview тахир дутуу сэргэнэ — файл шинэчлэх боломжгүй
+   *    болно. SAND-д «restart-д preview үхэхгүй» чанар байсан; энэ
+   *    интерфейс түүнгүйгээр тэр чанарыг биелүүлж чадахгүй байв.
+   *
+   * `MachineInfo.workspaceId` нь яг энэ функцэд дамжуулах id.
+   */
+  getWorkspace(id: string): Promise<Workspace | null>;
   create(spec: MachineSpec): Promise<Machine>;
 
   /**

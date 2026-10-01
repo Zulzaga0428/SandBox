@@ -566,6 +566,24 @@ export class DockerRuntime implements Runtime {
     return new DockerWorkspace(dir.slice(dir.lastIndexOf(sep) + 1), dir, this.limits);
   }
 
+  /**
+   * id-гаар workspace сэргээх. Хавтас диск дээр байвал объект шинээр
+   * үүсгэнэ — санах ойд хадгалсан бүртгэл ШААРДЛАГАГҮЙ. Энэ нь controller
+   * дахин эхлэхэд preview-үүд бүрэн сэргэх боломжийг өгнө.
+   */
+  async getWorkspace(id: string): Promise<Workspace | null> {
+    // id нь ЗӨВХӨН createWorkspace-ийн гаргасан хэлбэртэй байж болно.
+    // Эс тэгвэл `../` дамжуулж үндсэн хавтаснаас гарах зам нээгдэнэ.
+    if (!/^ws-[A-Za-z0-9_-]{1,32}$/.test(id)) return null;
+    const dir = join(this.root, id);
+    try {
+      if (!(await stat(dir)).isDirectory()) return null;
+    } catch {
+      return null;
+    }
+    return new DockerWorkspace(id, dir, this.limits);
+  }
+
   async create(spec: MachineSpec): Promise<Machine> {
     const ws = spec.workspace as DockerWorkspace;
     if (!ws.hostPath) {
